@@ -33,7 +33,7 @@ do
   size="$(stat -c%s "$path")"
   url="https://github.com/$REPO/releases/download/$VERSION/$filename"
 
-  artifacts="$(jq --argjson artifacts "$artifacts" \
+  artifacts="$(jq -n --argjson artifacts "$artifacts" \
     --arg component "$component" --arg os "$os" --arg arch "$arch" \
     --arg filename "$filename" --arg sha256 "$sha256" --argjson size "$size" \
     --arg url "$url" \
