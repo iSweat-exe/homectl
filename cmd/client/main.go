@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net"
@@ -20,17 +21,31 @@ import (
 	"homectl/internal/client/store"
 	"homectl/internal/shared/config"
 	"homectl/internal/shared/crypto"
+	"homectl/internal/shared/update"
+	"homectl/internal/shared/version"
 	frontendpkg "homectl/web"
 )
 
 func main() {
 	log.SetFlags(0)
 
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		if err := update.RunCLI("client", version.Version, config.ReleaseRepo, os.Args[2:]); err != nil {
+			log.Fatalf("update: %v", err)
+		}
+		return
+	}
+
 	flagSet := flag.NewFlagSet("homectl", flag.ExitOnError)
 	httpPort := flagSet.Int("http-port", config.DefaultHTTPPort, "local HTTP listen port")
 	configDir := flagSet.String("config-dir", "", "directory for client identity + known-servers state (default: OS config dir)")
+	versionFlag := flagSet.Bool("version", false, "print version and exit")
 	if err := flagSet.Parse(os.Args[1:]); err != nil {
 		log.Fatalf("parse flags: %v", err)
+	}
+	if *versionFlag {
+		fmt.Println(version.Version)
+		return
 	}
 
 	dir := *configDir

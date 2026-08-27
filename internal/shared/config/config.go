@@ -24,6 +24,10 @@ const (
 	// certificate after an operator opens the pairing window (SIGUSR1).
 	PairingWindowDuration = "2m0s"
 
+	// ReleaseRepo is the GitHub "owner/repo" the `update` subcommand fetches
+	// its release manifest from by default (see internal/shared/update).
+	ReleaseRepo = "iSweat-exe/homectl"
+
 	daemonStateDirEnv = "HOMECTL_STATE_DIR"
 	daemonRunDirEnv   = "HOMECTL_RUN_DIR"
 

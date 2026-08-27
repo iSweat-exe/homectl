@@ -95,6 +95,45 @@ other.
    info, a command console, file transfer, and systemd service management
    (start/stop/restart/enable/disable, plus live `journalctl -f` log tailing).
 
+## Releasing
+
+Pushing a semver tag (`vX.Y.Z`) triggers
+[.github/workflows/release.yml](.github/workflows/release.yml), which builds
+the frontend once, cross-compiles the daemon and client for `linux/amd64` and
+`linux/arm64` (both binaries embed the tag as their version via
+`-ldflags -X homectl/internal/shared/version.Version=...`, printed by
+`homectl-daemon version` / `homectl --version`), and publishes a GitHub
+release for the tag with these assets:
+
+- `homectl-daemon-linux-amd64`, `homectl-daemon-linux-arm64`
+- `homectl-linux-amd64`, `homectl-linux-arm64`
+- `manifest.json` — version, per-artifact `sha256`/size/download URL (see
+  [scripts/generate-manifest.sh](scripts/generate-manifest.sh)), fetched by
+  `homectl update` / `homectl-daemon update` (below) to find and verify the
+  binary matching their own component/OS/CPU architecture.
+
+```bash
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+## Updating
+
+```bash
+homectl update            # or: homectl-daemon update
+homectl update --check    # report an available update without installing it
+homectl update --repo someone/fork   # fetch the manifest from a different GitHub repo
+```
+
+Each command downloads `manifest.json` from the target repo's latest GitHub
+release, picks the artifact matching its own component (`client`/`daemon`)
+and the machine's OS/CPU architecture (`runtime.GOOS`/`runtime.GOARCH` —
+there's no build for anything but `linux/amd64` and `linux/arm64` yet, so it
+refuses to update on other platforms), verifies the download's `sha256`
+against the manifest, and replaces the running executable in place. Nothing
+restarts itself automatically — restart the daemon
+(`sudo systemctl restart homectl-daemon`) or the client yourself once it's
+done.
+
 ## Testing
 
 ```bash

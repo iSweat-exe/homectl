@@ -22,14 +22,27 @@ import (
 	"homectl/internal/daemon/pairing"
 	"homectl/internal/shared/config"
 	"homectl/internal/shared/crypto"
+	"homectl/internal/shared/update"
+	"homectl/internal/shared/version"
 )
 
 func main() {
 	log.SetFlags(0)
 
-	if len(os.Args) > 1 && os.Args[1] == "pair" {
-		pairCmd(os.Args[2:])
-		return
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "pair":
+			pairCmd(os.Args[2:])
+			return
+		case "version":
+			fmt.Println(version.Version)
+			return
+		case "update":
+			if err := update.RunCLI("daemon", version.Version, config.ReleaseRepo, os.Args[2:]); err != nil {
+				log.Fatalf("update: %v", err)
+			}
+			return
+		}
 	}
 	runCmd(os.Args[1:])
 }
