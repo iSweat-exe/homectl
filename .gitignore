@@ -1,0 +1,10 @@
+.claude
+.dev
+
+# Go build output (scripts/build.sh regenerates these)
+/dist/
+
+# Frontend dependencies and build output (npm run build regenerates dist/;
+# go:embed only needs it to exist at `go build ./cmd/client` time)
+web/node_modules/
+web/dist/

@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package homectl.v1;
+
+option go_package = "homectl/internal/shared/pb;pb";
+
+// PairingService is exempt from the "pinned client certificate" check in the
+// daemon's auth interceptor. It still requires a full mTLS handshake (the
+// client always presents a certificate), but the daemon does not require
+// that certificate's fingerprint to already be trusted. Pair() itself only
+// succeeds while the daemon's pairing window is open (see internal/daemon/pairing).
+service PairingService {
+  // GetFingerprint returns the daemon's own identity fingerprint, mostly
+  // useful for CLI/debugging cross-checks; clients should primarily derive
+  // the daemon fingerprint from the TLS certificate presented during the
+  // handshake itself, not from this RPC response.
+  rpc GetFingerprint(FingerprintRequest) returns (FingerprintResponse);
+
+  // Pair registers the caller's TLS client certificate fingerprint as
+  // trusted, if and only if the daemon's pairing window is currently open.
+  rpc Pair(PairRequest) returns (PairResponse);
+}
+
+// HomectlService requires an already-pinned client certificate (established
+// via a prior successful PairingService.Pair call).
+service HomectlService {
+  rpc SystemInfo(SystemInfoRequest) returns (SystemInfoResponse);
+
+  // Exec is bidirectional: the first ExecInput must carry a StartCommand;
+  // subsequent ExecInput messages may carry stdin chunks. The server streams
+  // back stdout/stderr chunks, terminated by one ExitStatus message.
+  rpc Exec(stream ExecInput) returns (stream ExecOutput);
+
+  // Upload is client-streaming: the first UploadChunk must carry the
+  // destination path; subsequent chunks carry raw file data.
+  rpc Upload(stream UploadChunk) returns (UploadSummary);
+
+  // Download is server-streaming: the daemon reads the requested path and
+  // streams it back as a sequence of DownloadChunk messages.
+  rpc Download(DownloadRequest) returns (stream DownloadChunk);
+
+  // ListServices lists systemd service units and their current state.
+  rpc ListServices(ListServicesRequest) returns (ListServicesResponse);
+
+  // ServiceAction starts, stops, restarts, enables, or disables a single
+  // systemd service unit.
+  rpc ServiceAction(ServiceActionRequest) returns (ServiceActionResponse);
+
+  // TailLogs streams `journalctl -u <unit> -f` output for a single systemd
+  // service unit, one line per message, until the caller disconnects.
+  rpc TailLogs(TailLogsRequest) returns (stream LogLine);
+}
+
+message FingerprintRequest {}
+
+message FingerprintResponse {
+  string fingerprint = 1;
+}
+
+message PairRequest {
+  // Human-readable label for the pairing client (e.g. its hostname),
+  // recorded alongside the pinned fingerprint for the operator's reference.
+  string client_name = 1;
+}
+
+message PairResponse {
+  bool accepted = 1;
+  string daemon_fingerprint = 2;
+  string message = 3;
+}
+
+message SystemInfoRequest {}
+
+message SystemInfoResponse {
+  string hostname = 1;
+  string os = 2;
+  string platform_version = 3;
+  uint64 uptime_seconds = 4;
+
+  string cpu_model = 5;
+  uint32 cpu_cores = 6;
+  double cpu_usage_percent = 7;
+
+  uint64 mem_total_bytes = 8;
+  uint64 mem_used_bytes = 9;
+
+  uint64 disk_total_bytes = 10;
+  uint64 disk_used_bytes = 11;
+}
+
+message StartCommand {
+  string command = 1;
+  repeated string args = 2;
+  string working_dir = 3;
+}
+
+message ExecInput {
+  oneof payload {
+    StartCommand start = 1;
+    bytes stdin = 2;
+    bool close_stdin = 3;
+  }
+}
+
+message ExecOutput {
+  oneof payload {
+    bytes stdout = 1;
+    bytes stderr = 2;
+    ExitStatus exit = 3;
+  }
+}
+
+message ExitStatus {
+  int32 code = 1;
+  string error = 2;
+}
+
+message UploadChunk {
+  oneof payload {
+    string destination_path = 1;
+    bytes data = 2;
+  }
+}
+
+message UploadSummary {
+  uint64 bytes_written = 1;
+  string path = 2;
+}
+
+message DownloadRequest {
+  string path = 1;
+}
+
+message DownloadChunk {
+  bytes data = 1;
+}
+
+message ListServicesRequest {}
+
+message ServiceUnit {
+  string name = 1;             // e.g. "nginx.service"
+  string description = 2;
+  string load_state = 3;       // loaded, not-found, masked...
+  string active_state = 4;     // active, inactive, failed, activating...
+  string sub_state = 5;        // running, dead, exited...
+  string unit_file_state = 6;  // enabled, disabled, static, masked...
+}
+
+message ListServicesResponse {
+  repeated ServiceUnit services = 1;
+}
+
+enum ServiceActionType {
+  SERVICE_ACTION_UNSPECIFIED = 0;
+  SERVICE_ACTION_START = 1;
+  SERVICE_ACTION_STOP = 2;
+  SERVICE_ACTION_RESTART = 3;
+  SERVICE_ACTION_ENABLE = 4;
+  SERVICE_ACTION_DISABLE = 5;
+}
+
+message ServiceActionRequest {
+  string unit = 1;
+  ServiceActionType action = 2;
+}
+
+message ServiceActionResponse {
+  bool success = 1;
+  string message = 2; // combined systemctl output, useful on failure
+}
+
+message TailLogsRequest {
+  string unit = 1;
+}
+
+message LogLine {
+  string text = 1;
+}

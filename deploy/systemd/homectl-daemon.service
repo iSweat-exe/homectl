@@ -1,0 +1,22 @@
+[Unit]
+Description=homectl daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/homectl-daemon
+Restart=on-failure
+RestartSec=2s
+
+# StateDirectory/RuntimeDirectory make systemd create and own
+# /var/lib/homectl and /run/homectl, matching the daemon's default
+# HOMECTL_STATE_DIR / HOMECTL_RUN_DIR paths (see internal/shared/config).
+StateDirectory=homectl
+StateDirectoryMode=0700
+RuntimeDirectory=homectl
+RuntimeDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target
